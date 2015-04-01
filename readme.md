@@ -8,7 +8,7 @@
 
 #如何使用
 - 首先安装Python2版本
-- 然后在命令行执行`python leanoteExportToMD.py`
+- 然后在命令行执行`python LeanoteExportToMD.py`
   - 如果报错，应该是你的 python 路径问题，或者缺少某些python module
 - 根据提示输入域名（默认是http://leanote.com）、用户邮箱、密码
   - 如果是自建服务器，请保证版本不低于 beta4
