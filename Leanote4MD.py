@@ -7,15 +7,13 @@
 
 import requests
 import json
+import os
+import sys
 from datetime import datetime
 import dateutil.parser
 from dateutil import tz
 from PIL import Image
 from StringIO import StringIO
-
-# leanote_host='http://leanote.com'
-# leanote_email=''
-# leanote_password=''
 
 
 def is_ok(myjson):
@@ -28,6 +26,7 @@ def is_ok(myjson):
         if json_object['Ok']:
             return True
         else:
+            print json_object['Msg']
             return False
     else:
         return True
@@ -60,6 +59,30 @@ def req_get(url, param = '', type = 'json', token = True):
         return None
 
 
+def req_post(url, param = '', type = 'json', token = True):
+    if token:
+        if param:
+            param.update({'token': leanote_token})
+        else:
+            param={'token': leanote_token}
+            
+    r = requests.post(leanote_host + '/api/' + url, data = param)
+    if r.status_code == requests.codes.ok:
+        if type=='json':
+            if is_ok(r.text):
+                rj = json.loads(r.text)
+                # if 'Msg' in rj:
+                #     rj=rj['Msg']
+                return rj
+            else:
+                print '[Err] requests to url %s fail' %(r.url)
+                return None
+                
+    else:
+        print '[Err] connect to url %s fail, error code %d ' %(r.url, r.status_cde)
+        return None
+
+
 #ret leanote_token
 def login(email, pwd):
     param = {
@@ -80,10 +103,13 @@ def logout():
 
 
 #ret dict(notebookId: type.Notebook}
-def getNotebooks():
+def getNotebooks(includeTrash = False):
     r = req_get('notebook/getNotebooks')
     if r:
-        return {notebook['NotebookId'] : notebook for notebook in r}
+        if includeTrash:
+            return {notebook['NotebookId'] : notebook for notebook in r}
+        else:
+            return {notebook['NotebookId'] : notebook for notebook in r if not notebook['IsDeleted']}
     else:
         return none
 
@@ -111,7 +137,56 @@ def getImage(fileId):
     return req_get('file/getImage', param, type = 'image')
 
 
-def saveToFile(notes, path = '.'):
+def addNotebook(title='Import', parentId='', seq=-1):
+    param = {
+        'title': title,
+        'parentNotebookId': parentId,
+        'seq' : seq
+    }
+    return req_post('notebook/addNotebook', param)
+
+
+def addNote(NotebookId, Title, Content, Tags=[], IsMarkdown = True, Abstract= '', Files=[]):
+    param = {
+        'NotebookId': NotebookId,
+        'Title': Title,
+        'Content': Content,
+        'Tags[]': Tags,
+        'IsMarkdown': IsMarkdown,
+        'Abstract': Abstract,
+        #'Files' : seq
+    }
+    return req_post('note/addNote', param)
+
+
+def readFromFile(filename):
+    import yaml
+    with open (filename) as file:
+        file_meta = ''
+        file_content = ''
+        meta_flag=False
+        for line in file:
+            #print line
+            if meta_flag:
+                file_content += line
+            else:
+                if line.find('---')>-1:
+                    meta_flag = True
+                else:
+                    file_meta += line
+                    #print meta
+        
+        if not meta_flag:
+            file_content = file_meta
+            file_meta = ''
+        if meta_flag:
+            meta = yaml.load(file_meta)
+        else:
+            meta = {}
+        return file_content, meta
+
+
+def saveToFile(notes, noteBooks, path = '.'):
     unique_noteTitle = set()
     for note in notes:
         if note['Title'] == '':
@@ -168,21 +243,10 @@ def saveToFile(notes, path = '.'):
                         i.save(attach['FileId'] + '.' + i.format)
 
 
-if __name__ == '__main__':
-    local_zone=tz.tzlocal()
-
-    leanote_host = raw_input("Enter your host: (default is http://leanote.com) ")
-    if not leanote_host:
-        leanote_host='http://leanote.com'
-    leanote_email = raw_input('Enter your email: ')
-    leanote_password = raw_input('Enter your password: ')
-    
-    print 'Connecting to %s' %leanote_host    
-    leanote_token = login(leanote_email, leanote_password)    
-
+def LeanoteExportToMD(path = '.'):
     print 'Reading your noteboos...'
     noteBooks = getNotebooks()
-    
+
     #get not deleted notes list
     notes=[]
     for notebook in noteBooks.values():
@@ -193,9 +257,84 @@ if __name__ == '__main__':
                         note = getNoteDetail(noteMeta['NoteId'])
                         notes.append(note)
     print 'found %d notes' %len(notes)
-    
+
     #write file
-    saveToFile(notes, path = '.')
-    
+    saveToFile(notes, noteBooks, path = path)
     logout()
     print 'all done, bye~'
+
+
+def LeanoteImportFromMD(path = '.'):
+    filelist = os.listdir(path)
+    filelist = [file for file in filelist if file.find('.md')>-1 or file.find('.txt')>-1]
+
+    importedNotebookTitleMapID = {}
+    ret = addNotebook(title='imported_note', parentId='', seq=-1)
+    if ret:
+        print 'imporing into a new notebook: %s' %ret['Title']
+        importedNotebookTitleMapID['import'] = ret['NotebookId']
+
+    for filename in filelist:
+        content, meta = readFromFile(path + '/' + filename)  
+    
+        parentTitle='import'
+        currentTitle=''
+        categories=meta.get('categories', ['import'])
+        for cat in categories:    
+            currentTitle=cat
+            if currentTitle in importedNotebookTitleMapID.keys():
+                parentTitle=currentTitle
+            else:
+                ret = addNotebook(title = currentTitle, parentId = importedNotebookTitleMapID[parentTitle])
+                importedNotebookTitleMapID[currentTitle] = ret['NotebookId']
+                parentTitle=currentTitle
+        
+        if not meta.get('title'):
+            meta['title'] = filename.replace('.md','').replace('.txt','')
+        importedNote = addNote(NotebookId=importedNotebookTitleMapID[currentTitle], Title=meta.get('title'), Content=content, Tags=meta.get('tags', []), Abstract='')
+        if importedNote:
+            print 'imported %s' %filename
+    logout()
+    print 'all done, bye~'
+
+
+if __name__ == '__main__':
+    choice = raw_input("Enter your choice: (import or export) ")
+        
+    leanote_host = raw_input("Enter your host: (default is http://leanote.com) ")
+    if not leanote_host:
+        leanote_host = 'http://leanote.com'
+    leanote_email = raw_input('Enter your email: ')
+    leanote_password = raw_input('Enter your password: ')
+    path = raw_input("Enter your save path: (default is current dir) ")
+    if not path:
+        path = '.'
+
+    # leanote_host='http://test.oldcat.me'
+    # leanote_email='admin@leanote.com'
+    # leanote_password='abc123'
+    # path = '.'
+
+    print 'Connecting to %s' %leanote_host
+    leanote_token = login(leanote_email, leanote_password)
+    local_zone=tz.tzlocal()
+    
+    if choice == 'import':        
+        LeanoteImportFromMD(path)
+        exit()
+
+    elif choice == 'export':
+        LeanoteExportToMD(path)
+        exit()
+    
+    else:
+        print 'command format: \npython Leanote4MD.py import\npython Leanote4MD.py export'
+
+
+
+    
+
+    
+
+
+    
