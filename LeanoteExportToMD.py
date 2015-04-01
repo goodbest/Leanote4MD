@@ -10,6 +10,8 @@ import json
 from datetime import datetime
 import dateutil.parser
 from dateutil import tz
+from PIL import Image
+from StringIO import StringIO
 
 # leanote_host='http://leanote.com'
 # leanote_email=''
@@ -31,7 +33,7 @@ def is_ok(myjson):
         return True
 
 
-def req_get(url, param = '', token = True):
+def req_get(url, param = '', type = 'json', token = True):
     if token:
         if param:
             param.update({'token': leanote_token})
@@ -40,14 +42,19 @@ def req_get(url, param = '', token = True):
             
     r = requests.get(leanote_host + '/api/' + url, params = param)
     if r.status_code == requests.codes.ok:
-        if is_ok(r.text):
-            rj = json.loads(r.text)
-            # if 'Msg' in rj:
-            #     rj=rj['Msg']
-            return rj
-        else:
-            print '[Err] requests to url %s fail' %(r.url)
-            return None
+        if type=='json':
+            if is_ok(r.text):
+                rj = json.loads(r.text)
+                # if 'Msg' in rj:
+                #     rj=rj['Msg']
+                return rj
+            else:
+                print '[Err] requests to url %s fail' %(r.url)
+                return None
+        elif type=='image':
+            i = Image.open(StringIO(r.content))
+            return i
+            
     else:
         print '[Err] connect to url %s fail, error code %d ' %(r.url, r.status_cde)
         return None
@@ -97,9 +104,16 @@ def getNoteDetail(noteId):
     return req_get('note/getNoteAndContent', param)
 
 
+def getImage(fileId):
+    param = {
+        'fileId': fileId,
+    }
+    return req_get('file/getImage', param, type = 'image')
+
+
 def saveToFile(notes, path = '.'):
     unique_noteTitle = set()
-    for note in notes:    
+    for note in notes:
         if note['Title'] == '':
             filename = note['NoteId']
         else:
@@ -144,8 +158,14 @@ def saveToFile(notes, path = '.'):
         
             file.write('---\n')
             file.write('%s' %note['Content'].encode('utf-8'))
-    
         file.close()
+        if note['Files']:
+            if len(note['Files']) > 0:
+                for attach in note['Files']:
+                    if not attach['IsAttach']:
+                        i = getImage(attach['FileId'])
+                        print 'saving its image: %s.%s' %(attach['FileId'], i.format)
+                        i.save(attach['FileId'] + '.' + i.format)
 
 
 if __name__ == '__main__':
