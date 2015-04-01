@@ -279,7 +279,10 @@ def LeanoteImportFromMD(path = '.'):
     
         parentTitle='import'
         currentTitle=''
-        categories=meta.get('categories', ['import'])
+        if not meta.get('categories'):
+            categories=['import']
+        else:
+            categories= meta.get('categories')
         for cat in categories:    
             currentTitle=cat
             if currentTitle in importedNotebookTitleMapID.keys():
@@ -310,7 +313,7 @@ if __name__ == '__main__':
     if not path:
         path = '.'
 
-    # leanote_host='http://test.oldcat.me'
+    # leanote_host='http://leanote.com'
     # leanote_email='admin@leanote.com'
     # leanote_password='abc123'
     # path = '.'

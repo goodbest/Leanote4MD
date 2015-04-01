@@ -16,13 +16,15 @@ tags:
 
 #如何使用
 - 首先安装Python2版本
-- 确保机器已经安装 `requests` `Pillow` 等模块，如果没装请 `pip install`
+- 确保机器已经安装 `requests` `Pillow` `PyYaml` 等模块，如果没装请 `pip install`
 - 然后在命令行执行`python leanote4MD.py`
   - 如果报错，应该是你的 python 路径问题，或者缺少某些python module
 - 根据提示输入域名（默认是http://leanote.com）、用户邮箱、密码
   - 域名不要忘记加`http://`
   - 如果是自建服务器，请保证版本不低于 beta4
   - 记得用邮箱，而不是用户名
+- 一般导入的错误都是文件没有严格按照YAML格式（多余空格等）造成的解析错误
+
 
 #功能
 
