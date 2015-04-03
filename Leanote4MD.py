@@ -14,6 +14,8 @@ import dateutil.parser
 from dateutil import tz
 from PIL import Image
 from StringIO import StringIO
+from requests_toolbelt import SSLAdapter
+import ssl
 
 
 def is_ok(myjson):
@@ -39,7 +41,10 @@ def req_get(url, param = '', type = 'json', token = True):
         else:
             param={'token': leanote_token}
             
-    r = requests.get(leanote_host + '/api/' + url, params = param)
+    s = requests.Session()
+    if leanote_host.startswith('https'):
+        s.mount('https://', SSLAdapter(ssl.PROTOCOL_TLSv1))        
+    r = s.get(leanote_host + '/api/' + url, params = param)
     if r.status_code == requests.codes.ok:
         if type=='json':
             if is_ok(r.text):
@@ -65,8 +70,11 @@ def req_post(url, param = '', type = 'json', token = True):
             param.update({'token': leanote_token})
         else:
             param={'token': leanote_token}
-            
-    r = requests.post(leanote_host + '/api/' + url, data = param)
+    
+    s = requests.Session()
+    if leanote_host.startswith('https'):
+        s.mount('https://', SSLAdapter(ssl.PROTOCOL_TLSv1))
+    r = s.post(leanote_host + '/api/' + url, data = param)
     if r.status_code == requests.codes.ok:
         if type=='json':
             if is_ok(r.text):
