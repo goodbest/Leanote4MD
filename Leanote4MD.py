@@ -258,7 +258,7 @@ def saveToFile(notes, noteBooks, path = '.'):
 
 
 def LeanoteExportToMD(path = '.'):
-    print 'Reading your noteboos...'
+    print 'Reading your notebooks...'
     noteBooks = getNotebooks()
 
     #get not deleted notes list
@@ -320,7 +320,7 @@ if __name__ == '__main__':
 
     leanote_host = raw_input("Enter your host: (default is http://leanote.com) ")
     if not leanote_host:
-        leanote_host = 'http://leanote.com'
+        leanote_host = 'https://leanote.com' #使用http://leanote.com会报503错误
     leanote_email = raw_input('Enter your email: ')
     leanote_password = raw_input('Enter your password: ')
     path = raw_input("Enter your save path: (default is current dir) ")
